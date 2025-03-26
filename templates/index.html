@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predictive Maintenance Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f5f5f5;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 15px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .prediction-result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .failure-likely {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .no-failure {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .progress {
+            height: 20px;
+            margin-bottom: 10px;
+        }
+        pre {
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Predictive Maintenance Dashboard</h1>
+        
+        <div class="row">
+            <!-- Dataset Statistics -->
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">Dataset Statistics</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <div class="stat-value">{{ stats.total_samples }}</div>
+                                    <div class="stat-label">Total Samples</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <div class="stat-value">{{ stats.machine_failures }}</div>
+                                    <div class="stat-label">Machine Failures</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <div class="stat-value">{{ "%.2f"|format(stats.failure_rate) }}%</div>
+                                    <div class="stat-label">Failure Rate</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Failure Type Breakdown -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Failure Type Distribution</div>
+                    <div class="card-body">
+                        <img src="data:image/png;base64,{{ failures_plot }}" class="img-fluid" alt="Failure Type Distribution">
+                        <div class="mt-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>TWF:</strong> {{ stats.failure_types.TWF }} (Tool Wear Failure)</p>
+                                    <p><strong>HDF:</strong> {{ stats.failure_types.HDF }} (Heat Dissipation Failure)</p>
+                                    <p><strong>PWF:</strong> {{ stats.failure_types.PWF }} (Power Failure)</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>OSF:</strong> {{ stats.failure_types.OSF }} (Overstrain Failure)</p>
+                                    <p><strong>RNF:</strong> {{ stats.failure_types.RNF }} (Random Failures)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Feature Correlation -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Feature Correlation</div>
+                    <div class="card-body">
+                        <img src="data:image/png;base64,{{ corr_plot }}" class="img-fluid" alt="Feature Correlation">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Feature Distributions -->
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">Feature Distributions</div>
+                    <div class="card-body">
+                        <img src="data:image/png;base64,{{ dist_plot }}" class="img-fluid" alt="Feature Distributions">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Prediction Form -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Make a Prediction</div>
+                    <div class="card-body">
+                        <form id="prediction-form">
+                            <div class="mb-3">
+                                <label for="air_temp" class="form-label">Air Temperature [K]</label>
+                                <input type="number" class="form-control" id="air_temp" name="air_temp" value="300" step="0.1">
+                            </div>
+                            <div class="mb-3">
+                                <label for="process_temp" class="form-label">Process Temperature [K]</label>
+                                <input type="number" class="form-control" id="process_temp" name="process_temp" value="310" step="0.1">
+                            </div>
+                            <div class="mb-3">
+                                <label for="rotational_speed" class="form-label">Rotational Speed [rpm]</label>
+                                <input type="number" class="form-control" id="rotational_speed" name="rotational_speed" value="1500" step="1">
+                            </div>
+                            <div class="mb-3">
+                                <label for="torque" class="form-label">Torque [Nm]</label>
+                                <input type="number" class="form-control" id="torque" name="torque" value="40" step="0.1">
+                            </div>
+                            <div class="mb-3">
+                                <label for="tool_wear" class="form-label">Tool Wear [min]</label>
+                                <input type="number" class="form-control" id="tool_wear" name="tool_wear" value="100" step="1">
+                            </div>
+                            <div class="mb-3">
+                                <label for="product_type" class="form-label">Product Type</label>
+                                <select class="form-control" id="product_type" name="product_type">
+                                    <option value="L">L (Low)</option>
+                                    <option value="M" selected>M (Medium)</option>
+                                    <option value="H">H (High)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Predict</button>
+                            <button type="button" id="train-button" class="btn btn-secondary">Train Models</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Prediction Results -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Prediction Results</div>
+                    <div class="card-body" id="prediction-results">
+                        <p class="text-center text-muted">Enter machine parameters to get predictions.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Model Results -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Combined Model Results</div>
+                    <div class="card-body">
+                        <pre>{{ model_results }}</pre>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Failure Type Model Results -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Failure Type Model Results</div>
+                    <div class="card-body">
+                        <pre>{{ failure_model_results }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('prediction-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            // Show loading
+            document.getElementById('prediction-results').innerHTML = '<p class="text-center">Loading prediction results...</p>';
+            
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                let resultsHtml = '<h5>Prediction Results:</h5>';
+                
+                // Overall machine failure
+                if (data['Machine Failure']) {
+                    const prob = data['Machine Failure'].probability;
+                    const predClass = prob > 0.5 ? 'failure-likely' : 'no-failure';
+                    const predText = data['Machine Failure'].prediction;
+                    
+                    resultsHtml += `
+                        <div class="mb-3">
+                            <h6>Overall Machine Failure</h6>
+                            <div class="progress">
+                                <div class="progress-bar bg-danger" role="progressbar" style="width: ${prob * 100}%" 
+                                    aria-valuenow="${prob * 100}" aria-valuemin="0" aria-valuemax="100">
+                                    ${(prob * 100).toFixed(1)}%
+                                </div>
+                            </div>
+                            <div class="prediction-result ${predClass}">
+                                ${predText} (${(prob * 100).toFixed(1)}% probability)
+                            </div>
+                        </div>`;
+                }
+                
+                // Individual failure types
+                resultsHtml += '<h6>Failure Type Predictions:</h6>';
+                
+                for (const type of ['TWF', 'HDF', 'PWF', 'OSF', 'RNF']) {
+                    if (data[type]) {
+                        const prob = data[type].probability;
+                        const predClass = prob > 0.5 ? 'failure-likely' : 'no-failure';
+                        const predText = data[type].prediction;
+                        
+                        let typeName = '';
+                        switch(type) {
+                            case 'TWF': typeName = 'Tool Wear Failure'; break;
+                            case 'HDF': typeName = 'Heat Dissipation Failure'; break;
+                            case 'PWF': typeName = 'Power Failure'; break;
+                            case 'OSF': typeName = 'Overstrain Failure'; break;
+                            case 'RNF': typeName = 'Random Failure'; break;
+                        }
+                        
+                        resultsHtml += `
+                            <div class="mb-2">
+                                <strong>${type}</strong> (${typeName}):
+                                <div class="progress">
+                                    <div class="progress-bar ${prob > 0.5 ? 'bg-danger' : 'bg-success'}" role="progressbar" 
+                                        style="width: ${prob * 100}%" aria-valuenow="${prob * 100}" 
+                                        aria-valuemin="0" aria-valuemax="100">
+                                        ${(prob * 100).toFixed(1)}%
+                                    </div>
+                                </div>
+                            </div>`;
+                    }
+                }
+                
+                document.getElementById('prediction-results').innerHTML = resultsHtml;
+            })
+            .catch(error => {
+                document.getElementById('prediction-results').innerHTML = 
+                    `<div class="alert alert-danger">Error making prediction: ${error.message}</div>`;
+            });
+        });
+        
+        document.getElementById('train-button').addEventListener('click', function() {
+            // Show loading
+            this.disabled = true;
+            this.innerHTML = 'Training Models...';
+            
+            fetch('/train_models', {
+                method: 'POST'
+            })
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+                location.reload();
+            })
+            .catch(error => {
+                alert('Error training models: ' + error.message);
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.innerHTML = 'Train Models';
+            });
+        });
+    </script>
+</body>
+</html> 

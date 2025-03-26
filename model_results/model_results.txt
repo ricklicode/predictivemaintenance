@@ -1,0 +1,66 @@
+Predictive Maintenance Model Results
+===================================
+
+Dataset: uc_pred_mait_ds.csv
+Total samples: 10000
+Machine failures: 339 (3.39%)
+
+
+Basic Model Performance:
+- Accuracy: 0.9815
+- AUC-ROC: 0.9607
+
+Confusion Matrix:
+TN: 1929, FP: 3
+FN: 34, TP: 34
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.98      1.00      0.99      1932
+           1       0.92      0.50      0.65        68
+
+    accuracy                           0.98      2000
+   macro avg       0.95      0.75      0.82      2000
+weighted avg       0.98      0.98      0.98      2000
+
+Feature Importance:
+- Torque [Nm]: 0.3228
+- Rotational speed [rpm]: 0.2369
+- Tool wear [min]: 0.1639
+- Air temperature [K]: 0.1295
+- Process temperature [K]: 0.1228
+- Type_L: 0.0111
+- Type_M: 0.0080
+- Type_H: 0.0049
+
+
+Model with Engineered Features Performance:
+- Accuracy: 0.9925
+- AUC-ROC: 0.9751
+
+Confusion Matrix:
+TN: 1930, FP: 2
+FN: 13, TP: 55
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.99      1.00      1.00      1932
+           1       0.96      0.81      0.88        68
+
+    accuracy                           0.99      2000
+   macro avg       0.98      0.90      0.94      2000
+weighted avg       0.99      0.99      0.99      2000
+
+Feature Importance:
+- Tool_Torque [minNm]: 0.2117
+- Power [W]: 0.2051
+- Rotational speed [rpm]: 0.1587
+- Torque [Nm]: 0.1364
+- Temp_Diff [K]: 0.1181
+- Tool wear [min]: 0.0575
+- Air temperature [K]: 0.0391
+- Process temperature [K]: 0.0377
+- Type_L: 0.0171
+- Type_M: 0.0127

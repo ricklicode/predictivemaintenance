@@ -1,0 +1,127 @@
+Predictive Maintenance Dataset Analysis
+======================================
+
+Dataset: uc_pred_mait_ds.csv
+Total samples: 10000
+Machine failures: 339 (3.39%)
+
+Failure modes:
+- TWF: 46 (0.46%)
+- HDF: 115 (1.15%)
+- PWF: 95 (0.95%)
+- OSF: 98 (0.98%)
+- RNF: 19 (0.19%)
+
+Product Type Distribution:
+- L: 6000 products, 235 failures (3.92% failure rate)
+- M: 2997 products, 83 failures (2.77% failure rate)
+- H: 1003 products, 21 failures (2.09% failure rate)
+
+Correlations with Machine Failure:
+- Torque [Nm]: 0.1913
+- Tool wear [min]: 0.1054
+- Air temperature [K]: 0.0826
+- Process temperature [K]: 0.0359
+- Rotational speed [rpm]: -0.0442
+
+Detailed Statistics by Feature and Failure Status:
+
+Air temperature [K]:
+  Failed Machines:
+    count: 339.00
+    mean: 300.89
+    std: 2.07
+    min: 295.60
+    25%: 299.10
+    50%: 301.60
+    75%: 302.50
+    max: 304.40
+  Non-failed Machines:
+    count: 9661.00
+    mean: 299.97
+    std: 1.99
+    min: 295.30
+    25%: 298.30
+    50%: 300.00
+    75%: 301.50
+    max: 304.50
+
+Process temperature [K]:
+  Failed Machines:
+    count: 339.00
+    mean: 310.29
+    std: 1.36
+    min: 306.10
+    25%: 309.50
+    50%: 310.40
+    75%: 311.20
+    max: 313.70
+  Non-failed Machines:
+    count: 9661.00
+    mean: 310.00
+    std: 1.49
+    min: 305.70
+    25%: 308.80
+    50%: 310.00
+    75%: 311.10
+    max: 313.80
+
+Rotational speed [rpm]:
+  Failed Machines:
+    count: 339.00
+    mean: 1496.49
+    std: 384.94
+    min: 1181.00
+    25%: 1326.50
+    50%: 1365.00
+    75%: 1421.50
+    max: 2886.00
+  Non-failed Machines:
+    count: 9661.00
+    mean: 1540.26
+    std: 167.39
+    min: 1168.00
+    25%: 1429.00
+    50%: 1507.00
+    75%: 1615.00
+    max: 2695.00
+
+Torque [Nm]:
+  Failed Machines:
+    count: 339.00
+    mean: 50.17
+    std: 16.37
+    min: 3.80
+    25%: 45.95
+    50%: 53.70
+    75%: 61.20
+    max: 76.60
+  Non-failed Machines:
+    count: 9661.00
+    mean: 39.63
+    std: 9.47
+    min: 12.60
+    25%: 33.10
+    50%: 39.90
+    75%: 46.30
+    max: 70.00
+
+Tool wear [min]:
+  Failed Machines:
+    count: 339.00
+    mean: 143.78
+    std: 72.76
+    min: 0.00
+    25%: 84.50
+    50%: 165.00
+    75%: 207.50
+    max: 253.00
+  Non-failed Machines:
+    count: 9661.00
+    mean: 106.69
+    std: 62.95
+    min: 0.00
+    25%: 52.00
+    50%: 107.00
+    75%: 160.00
+    max: 246.00
