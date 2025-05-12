@@ -1,0 +1,26 @@
+Model Results
+=============
+
+Accuracy: 0.9840
+ROC AUC: 0.9746
+Average Precision: 0.7791
+Training Time: 10.87 seconds
+
+Best Parameters:
+  class_weight: balanced
+  max_depth: 20
+  max_features: sqrt
+  min_samples_leaf: 1
+  min_samples_split: 5
+  n_estimators: 200
+
+Top 5 Features by Importance:
+  Torque [Nm]: 0.3199
+  Rotational speed [rpm]: 0.3140
+  Tool wear [min]: 0.2188
+  Air temperature [K]: 0.0920
+  Process temperature [K]: 0.0554
+F1 Score: 0.7288
+Confusion Matrix:
+  [1925, 7]
+  [25, 43]

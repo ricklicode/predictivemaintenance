@@ -84,31 +84,63 @@ def create_plot(plt_figure):
     return base64.b64encode(img.getvalue()).decode('utf8')
 
 def load_model_results():
-    """Load model results and metrics"""
+    """Load model results and metrics in a frontend-friendly format"""
     results = {}
-    
-    # Load results text file
+
+    # Parse metrics from results.txt
+    metrics = {}
+    best_params = {}
     with open('model_results/results.txt', 'r') as f:
-        results['text'] = f.read()
-    
-    # Load model and scaler
-    with open('model_results/model.pkl', 'rb') as f:
-        results['model'] = pickle.load(f)
-    with open('model_results/scaler.pkl', 'rb') as f:
-        results['scaler'] = pickle.load(f)
-    
+        for line in f:
+            if line.startswith('Accuracy:'):
+                metrics['accuracy'] = float(line.split(':')[1].strip())
+            elif line.startswith('ROC AUC:'):
+                metrics['roc_auc'] = float(line.split(':')[1].strip())
+            elif line.startswith('Average Precision:'):
+                metrics['avg_precision'] = float(line.split(':')[1].strip())
+            elif line.startswith('Training Time:'):
+                metrics['training_time'] = float(line.split(':')[1].strip().split()[0])
+            elif line.startswith('F1 Score:'):
+                metrics['f1'] = float(line.split(':')[1].strip())
+            elif line.strip().startswith('Best Parameters:'):
+                section = 'params'
+            elif line.strip().startswith('Top 5 Features by Importance:'):
+                section = 'features'
+            elif 'section' in locals() and section == 'params' and ':' in line:
+                param, value = line.strip().split(':', 1)
+                best_params[param.strip()] = value.strip()
+            elif 'section' in locals() and section == 'features' and ':' in line:
+                # skip, handled by feature_importance.csv
+                pass
+
     # Load feature importance
     feature_importance = pd.read_csv('model_results/feature_importance.csv')
-    results['feature_importance'] = feature_importance.to_dict('records')
-    
+    feature_importance_list = feature_importance.to_dict('records')
+
     # Load ROC curve data
     with open('model_results/roc_data.json', 'r') as f:
-        results['roc_data'] = json.load(f)
-    
+        roc_data = json.load(f)
+
     # Load PR curve data
     with open('model_results/pr_data.json', 'r') as f:
-        results['pr_data'] = json.load(f)
-    
+        pr_data = json.load(f)
+
+    # Load confusion matrix
+    with open('model_results/confusion_matrix.json', 'r') as f:
+        confusion_matrix_data = json.load(f)['confusion_matrix']
+
+    # Load feature distributions
+    with open('model_results/feature_distributions.json', 'r') as f:
+        feature_distributions = json.load(f)
+
+    # Compose results for frontend
+    results.update(metrics)
+    results['feature_importance'] = feature_importance_list
+    results['roc_data'] = roc_data
+    results['pr_data'] = pr_data
+    results['best_params'] = best_params
+    results['confusion_matrix'] = confusion_matrix_data
+    results['feature_distributions'] = feature_distributions
     return results
 
 # Routes
@@ -171,10 +203,11 @@ def index():
     # Load model results
     try:
         results = load_model_results()
-        model_results = results['text']
+        model_results = results.get('text', "Model results not available.")
         failure_model_results = "Model results not available."
     except:
         model_results = "Model results not available."
+        failure_model_results = "Model results not available."
     
     return render_template('index.html', 
                           stats=stats,
@@ -239,4 +272,4 @@ if __name__ == '__main__':
     if not os.path.exists('failure_type_results'):
         os.makedirs('failure_type_results', exist_ok=True)
     
-    app.run(debug=True) 
+    app.run(debug=True, port=8080) 

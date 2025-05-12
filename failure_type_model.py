@@ -154,18 +154,18 @@ for failure_mode in failure_modes:
     print(f"\nTop 5 Features for {failure_mode}:")
     for i, row in feature_importance.head(5).iterrows():
         print(f"  {row['Feature']}: {row['Importance']:.4f}")
-    
+        
     # Permutation importance
     result = permutation_importance(model, X_test, y_test, n_repeats=10, random_state=42, n_jobs=-1)
     perm_importance = pd.DataFrame({
-        'Feature': features,
+    'Feature': features,
         'Importance': result.importances_mean
-    }).sort_values('Importance', ascending=False)
-    
+}).sort_values('Importance', ascending=False)
+
     print(f"\nTop 5 Features by Permutation Importance for {failure_mode}:")
     for i, row in perm_importance.head(5).iterrows():
-        print(f"  {row['Feature']}: {row['Importance']:.4f}")
-    
+    print(f"  {row['Feature']}: {row['Importance']:.4f}")
+
     # Save the model
     with open(f'failure_type_results/{failure_mode.lower()}_model.pkl', 'wb') as f:
         pickle.dump(model, f)

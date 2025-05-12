@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKF
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     classification_report, confusion_matrix, accuracy_score,
-    roc_curve, auc, precision_recall_curve, average_precision_score
+    roc_curve, auc, precision_recall_curve, average_precision_score, f1_score
 )
 from sklearn.preprocessing import StandardScaler
 import os
@@ -238,6 +238,8 @@ class PredictiveMaintenanceModel:
         avg_precision = average_precision_score(y_test, y_pred_proba)
         fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
         roc_auc = auc(fpr, tpr)
+        f1 = f1_score(y_test, y_pred)
+        cm = confusion_matrix(y_test, y_pred)
         
         # Calculate feature importance
         self.feature_importance = pd.DataFrame({
@@ -257,11 +259,35 @@ class PredictiveMaintenanceModel:
             'Importance': result.importances_mean
         }).sort_values('Importance', ascending=False)
         
+        # Save confusion matrix as image and JSON
+        plt.figure(figsize=(6, 5))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=[0,1], yticklabels=[0,1])
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
+        plt.title('Confusion Matrix')
+        plt.tight_layout()
+        plt.savefig(f'{self.output_dir}/confusion_matrix.png')
+        plt.close()
+        with open(f'{self.output_dir}/confusion_matrix.json', 'w') as f:
+            json.dump({'confusion_matrix': cm.tolist()}, f)
+
+        # Save feature distributions (histogram data)
+        feature_distributions = {}
+        for col in X.columns:
+            counts, bin_edges = np.histogram(X[col], bins=20)
+            feature_distributions[col] = {
+                'counts': counts.tolist(),
+                'bin_edges': bin_edges.tolist()
+            }
+        with open(f'{self.output_dir}/feature_distributions.json', 'w') as f:
+            json.dump(feature_distributions, f)
+
         # Save results
         results = {
             'accuracy': accuracy,
             'roc_auc': roc_auc,
             'avg_precision': avg_precision,
+            'f1': f1,
             'best_params': grid_search.best_params_,
             'feature_importance': self.feature_importance.to_dict(),
             'permutation_importance': self.permutation_importance.to_dict(),
@@ -269,7 +295,9 @@ class PredictiveMaintenanceModel:
             'fpr': fpr.tolist(),
             'tpr': tpr.tolist(),
             'precision': precision.tolist(),
-            'recall': recall.tolist()
+            'recall': recall.tolist(),
+            'confusion_matrix': cm.tolist(),
+            'feature_distributions': feature_distributions
         }
         
         # Save model and results
@@ -343,22 +371,12 @@ class PredictiveMaintenanceModel:
                 'recall': results['recall']
             }, f)
         
-        # Save results text file
-        with open(f'{self.output_dir}/results.txt', 'w') as f:
-            f.write("Model Results\n")
-            f.write("=============\n\n")
-            f.write(f"Accuracy: {results['accuracy']:.4f}\n")
-            f.write(f"ROC AUC: {results['roc_auc']:.4f}\n")
-            f.write(f"Average Precision: {results['avg_precision']:.4f}\n")
-            f.write(f"Training Time: {results['training_time']:.2f} seconds\n\n")
-            
-            f.write("Best Parameters:\n")
-            for param, value in results['best_params'].items():
-                f.write(f"  {param}: {value}\n")
-            
-            f.write("\nTop 5 Features by Importance:\n")
-            for i, row in self.feature_importance.head(5).iterrows():
-                f.write(f"  {row['Feature']}: {row['Importance']:.4f}\n")
+        # Save F1 and confusion matrix in results.txt
+        with open(f'{self.output_dir}/results.txt', 'a') as f:
+            f.write(f"F1 Score: {results['f1']:.4f}\n")
+            f.write("Confusion Matrix:\n")
+            for row in results['confusion_matrix']:
+                f.write(f"  {row}\n")
         
         # Create visualizations
         self._create_visualizations(results)
