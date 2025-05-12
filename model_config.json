@@ -1,0 +1,12 @@
+{
+    "feature_columns": [
+        "Air temperature [K]",
+        "Process temperature [K]",
+        "Rotational speed [rpm]",
+        "Torque [Nm]",
+        "Tool wear [min]"
+    ],
+    "failure_column": "Machine failure",
+    "id_column": "UID",
+    "output_dir": "model_results"
+} 

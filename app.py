@@ -12,6 +12,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import io
 import base64
+from generalized_model import PredictiveMaintenanceModel
 
 app = Flask(__name__)
 
@@ -82,9 +83,38 @@ def create_plot(plt_figure):
     img.seek(0)
     return base64.b64encode(img.getvalue()).decode('utf8')
 
+def load_model_results():
+    """Load model results and metrics"""
+    results = {}
+    
+    # Load results text file
+    with open('model_results/results.txt', 'r') as f:
+        results['text'] = f.read()
+    
+    # Load model and scaler
+    with open('model_results/model.pkl', 'rb') as f:
+        results['model'] = pickle.load(f)
+    with open('model_results/scaler.pkl', 'rb') as f:
+        results['scaler'] = pickle.load(f)
+    
+    # Load feature importance
+    feature_importance = pd.read_csv('model_results/feature_importance.csv')
+    results['feature_importance'] = feature_importance.to_dict('records')
+    
+    # Load ROC curve data
+    with open('model_results/roc_data.json', 'r') as f:
+        results['roc_data'] = json.load(f)
+    
+    # Load PR curve data
+    with open('model_results/pr_data.json', 'r') as f:
+        results['pr_data'] = json.load(f)
+    
+    return results
+
 # Routes
 @app.route('/')
 def index():
+    """Render the main dashboard page"""
     # Make sure models are loaded
     models = train_models_if_needed()
     
@@ -140,16 +170,11 @@ def index():
     
     # Load model results
     try:
-        with open('model_results/model_results.txt', 'r') as f:
-            model_results = f.read()
+        results = load_model_results()
+        model_results = results['text']
+        failure_model_results = "Model results not available."
     except:
         model_results = "Model results not available."
-    
-    try:
-        with open('failure_type_results/failure_type_models.txt', 'r') as f:
-            failure_model_results = f.read()
-    except:
-        failure_model_results = "Failure type model results not available."
     
     return render_template('index.html', 
                           stats=stats,
@@ -159,60 +184,39 @@ def index():
                           model_results=model_results,
                           failure_model_results=failure_model_results)
 
-@app.route('/predict', methods=['POST'])
+@app.route('/api/results')
+def get_results():
+    """API endpoint to get model results"""
+    try:
+        results = load_model_results()
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/predict', methods=['POST'])
 def predict():
-    # Make sure models are loaded
-    models = train_models_if_needed()
-    
-    # Get data from form
-    data = {}
-    data['Air temperature [K]'] = float(request.form.get('air_temp', 300))
-    data['Process temperature [K]'] = float(request.form.get('process_temp', 310))
-    data['Rotational speed [rpm]'] = float(request.form.get('rotational_speed', 1500))
-    data['Torque [Nm]'] = float(request.form.get('torque', 40))
-    data['Tool wear [min]'] = float(request.form.get('tool_wear', 100))
-    product_type = request.form.get('product_type', 'M')
-    
-    # Create DataFrame for prediction
-    df = pd.DataFrame([data])
-    
-    # Add product type dummies
-    df['Product_Type_L'] = 1 if product_type == 'L' else 0
-    df['Product_Type_M'] = 1 if product_type == 'M' else 0
-    df['Product_Type_H'] = 1 if product_type == 'H' else 0
-    
-    # Engineer features
-    df['Power [W]'] = df['Torque [Nm]'] * df['Rotational speed [rpm]'] / 9.5488
-    df['Temp_Diff [K]'] = df['Process temperature [K]'] - df['Air temperature [K]']
-    df['Tool_Torque [minNm]'] = df['Tool wear [min]'] * df['Torque [Nm]']
-    
-    # Scale features if scaler exists
-    if 'scaler' in models:
-        features = df.values
-        features = models['scaler'].transform(features)
-        df_scaled = pd.DataFrame(features, columns=df.columns)
-    else:
-        df_scaled = df
-    
-    # Make predictions for each failure type
-    results = {}
-    
-    if 'combined' in models:
-        prob = models['combined'].predict_proba(df_scaled)[0][1]
-        results['Machine Failure'] = {
-            'probability': float(prob),
-            'prediction': 'Failure likely' if prob > 0.5 else 'No failure'
-        }
-    
-    for failure_type in ['TWF', 'HDF', 'PWF', 'OSF', 'RNF']:
-        if failure_type in models:
-            prob = models[failure_type].predict_proba(df_scaled)[0][1]
-            results[failure_type] = {
-                'probability': float(prob),
-                'prediction': 'Failure likely' if prob > 0.5 else 'No failure'
-            }
-    
-    return jsonify(results)
+    """API endpoint to make predictions"""
+    try:
+        data = request.json
+        features = pd.DataFrame([data['features']])
+        
+        # Load model and scaler
+        with open('model_results/model.pkl', 'rb') as f:
+            model = pickle.load(f)
+        with open('model_results/scaler.pkl', 'rb') as f:
+            scaler = pickle.load(f)
+        
+        # Scale features and make prediction
+        features_scaled = scaler.transform(features)
+        prediction = model.predict(features_scaled)[0]
+        probability = model.predict_proba(features_scaled)[0][1]
+        
+        return jsonify({
+            'prediction': int(prediction),
+            'probability': float(probability)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Save models for the app to use
 def save_models_for_app():

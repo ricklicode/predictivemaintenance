@@ -1,158 +1,150 @@
-# Predictive Maintenance System
+# Predictive Maintenance Model
 
-This project implements a machine learning solution for predictive maintenance using scikit-learn. It includes scripts for data analysis, model training, and a web application for interactive predictions.
+A flexible and optimized machine learning model for predictive maintenance tasks. This project provides a generalized solution that can work with any dataset containing numeric features and a binary failure column.
 
-## Dataset
+## Features
 
-The project uses the UC Predictive Maintenance dataset with 10,000 data points and the following features:
-- UID: unique identifier 
-- Product ID: product quality variants (L, M, H) with serial numbers
-- Air temperature [K]
-- Process temperature [K]
-- Rotational speed [rpm]
-- Torque [Nm]
-- Tool wear [min]
-- Machine failure (target label)
+- **Flexible Configuration**: Configure the model through a JSON file to work with any dataset
+- **Advanced Feature Engineering**: Automatic creation of interaction features using optimized numpy operations
+- **Optimized Training**: Fast model training with reduced hyperparameter search space and early stopping
+- **Comprehensive Evaluation**: Detailed performance metrics and visualizations
+- **Interactive Dashboard**: Web-based dashboard to visualize model results and make predictions
+- **Cross-Validation**: 5-fold stratified cross-validation for reliable performance estimation
 
-The machine failures can be due to five different modes:
-- Tool wear failure (TWF)
-- Heat dissipation failure (HDF)
-- Power failure (PWF)
-- Overstrain failure (OSF)
-- Random failures (RNF)
+## Installation
 
-## Project Structure
-
-```
-.
-├── README.md                          # Project documentation
-├── requirements.txt                   # Dependencies
-├── uc_pred_mait_ds.csv                # Dataset file
-├── app.py                             # Web application
-├── simple_model.py                    # Model training script
-├── simple_analysis.py                 # Dataset analysis script
-├── failure_type_model.py              # Failure type prediction models
-├── failure_type_results/              # Failure type model results
-│   ├── failure_type_models.txt        # Detailed model metrics
-│   ├── combined_model.pkl             # Combined failure prediction model
-│   ├── twf_model.pkl                  # Tool wear failure model
-│   ├── hdf_model.pkl                  # Heat dissipation failure model
-│   ├── pwf_model.pkl                  # Power failure model
-│   ├── osf_model.pkl                  # Overstrain failure model
-│   ├── rnf_model.pkl                  # Random failure model
-│   └── scaler.pkl                     # Feature scaler
-├── model_results/                     # Combined model results
-│   └── model_results.txt              # Model performance metrics
-├── simple_results/                    # Analysis results
-│   └── dataset_analysis.txt           # Dataset statistics
-└── templates/                         # Web app templates
-    └── index.html                     # Dashboard UI template
-```
-
-## Setup and Installation
-
-1. Create a virtual environment:
-   ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-3. Ensure you have the dataset file `uc_pred_mait_ds.csv` in the project root directory.
-
-## Running the Data Analysis
-
-To analyze the dataset and generate statistics:
-
+1. Clone the repository:
 ```bash
-python simple_analysis.py
+git clone <repository-url>
+cd predictivemaintenance
 ```
 
-This will create a `simple_results` directory with analysis results.
-
-## Training Models
-
-To train the combined machine failure prediction model:
-
+2. Create and activate a virtual environment:
 ```bash
-python simple_model.py
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-To train models for each failure type:
-
+3. Install dependencies:
 ```bash
-python failure_type_model.py
+pip install -r requirements.txt
 ```
 
-The trained models will be saved in the `failure_type_results` directory.
+## Usage
 
-## Web Application
+### 1. Prepare Your Data
 
-The project includes a web-based dashboard for visualizing results and making predictions.
+Your dataset should contain:
+- Numeric features
+- A binary failure column
+- (Optional) An ID column
 
-### Starting the Web App
+### 2. Configure the Model
 
-To launch the web application:
+Create a `model_config.json` file:
+```json
+{
+    "feature_columns": [
+        "Air temperature [K]",
+        "Process temperature [K]",
+        "Rotational speed [rpm]",
+        "Torque [Nm]",
+        "Tool wear [min]"
+    ],
+    "failure_column": "Machine failure",
+    "id_column": "UID",
+    "output_dir": "model_results"
+}
+```
 
+### 3. Train the Model
+
+```python
+from generalized_model import PredictiveMaintenanceModel
+
+# Initialize model with configuration
+model = PredictiveMaintenanceModel('model_config.json')
+
+# Load your data
+import pandas as pd
+df = pd.read_csv('your_dataset.csv')
+
+# Train the model
+results = model.fit(df)
+```
+
+### 4. Make Predictions
+
+```python
+# Make predictions on new data
+new_data = df.sample(10)  # Example: predict on 10 random samples
+predictions, probabilities = model.predict(new_data)
+```
+
+### 5. View Results
+
+Run the web dashboard:
 ```bash
 python app.py
 ```
 
-This will start a Flask server, typically at http://127.0.0.1:5000/
+Visit `http://localhost:5000` to view:
+- Model performance metrics
+- Feature importance analysis
+- ROC and Precision-Recall curves
+- Model parameters
 
-### Accessing the Dashboard
+## Model Details
 
-1. Open your web browser and go to http://127.0.0.1:5000/
-2. You'll see the main dashboard with dataset statistics, visualizations, and the prediction interface.
+### Feature Engineering
+- Automatic creation of interaction features
+- Optimized using numpy operations for better performance
+- Handles missing values and scaling
 
-### Using the Prediction Interface
+### Training Process
+- 5-fold stratified cross-validation
+- Optimized hyperparameter search
+- Early stopping for faster training
+- Parallel processing for improved speed
 
-The web application allows you to make predictions with the trained models:
+### Performance Metrics
+- Accuracy
+- ROC AUC
+- Average Precision
+- Feature Importance
+- Training Time
 
-1. Navigate to the "Make a Prediction" section of the dashboard.
-2. Enter values for the machine parameters:
-   - Air Temperature [K]
-   - Process Temperature [K]
-   - Rotational Speed [rpm]
-   - Torque [Nm]
-   - Tool Wear [min]
-   - Product Type (L, M, or H)
-3. Click the "Predict" button to get failure predictions.
-4. The results will show:
-   - Overall machine failure probability
-   - Individual probabilities for each failure type (TWF, HDF, PWF, OSF, RNF)
+## Project Structure
 
-### Training Models Through the Web Interface
+```
+predictivemaintenance/
+├── generalized_model.py    # Main model implementation
+├── app.py                 # Web dashboard
+├── model_config.json      # Model configuration
+├── requirements.txt       # Project dependencies
+├── model_results/         # Saved model and results
+│   ├── model.pkl
+│   ├── scaler.pkl
+│   ├── feature_importance.csv
+│   ├── results.txt
+│   └── visualizations/
+└── templates/            # Web dashboard templates
+    └── index.html
+```
 
-If you need to retrain models:
+## Performance Optimization
 
-1. Click the "Train Models" button in the prediction form.
-2. Wait for the training to complete (this may take a few minutes).
-3. The page will refresh with updated model information.
+The model has been optimized for speed and efficiency:
+1. **Feature Engineering**: Uses numpy operations instead of pandas
+2. **Hyperparameter Search**: Reduced search space for faster training
+3. **Early Stopping**: Starts from optimized default parameters
+4. **Parallel Processing**: Utilizes multiple CPU cores
+5. **Memory Efficiency**: Optimized data structures and operations
 
-## Model Training Details
+## Contributing
 
-The models are trained with a proper data splitting strategy:
-
-1. **Training Set (60% of data)**: Used to train the models
-2. **Validation Set (20% of data)**: Used to monitor performance during development
-3. **Test Set (20% of data)**: Used for final evaluation
-
-All splits are stratified to maintain the same class distribution, and use fixed random seeds for reproducibility.
-
-## Model Performance
-
-The performance metrics for each model are available in `failure_type_results/failure_type_models.txt`. Key highlights:
-
-- High accuracy across all models (>99%)
-- AUC-ROC values near 1.0 for most failure types
-- Power Failure (PWF) prediction achieves perfect accuracy
-- The combined model achieves 99.25% test accuracy with 0.95+ AUC-ROC
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is open-source and available under the MIT License.
+This project is licensed under the MIT License - see the LICENSE file for details.

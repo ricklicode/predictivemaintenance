@@ -1,16 +1,20 @@
 #!/usr/bin/env python
 """
 Script to train predictive maintenance models for each failure type (TWF, HDF, PWF, OSF, RNF).
-Uses Random Forest models with engineered features.
+Uses Random Forest models with engineered features and hyperparameter tuning.
 """
 
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_curve, auc
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_curve, auc, precision_recall_curve, average_precision_score
 import os
 import time
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.inspection import permutation_importance
+import pickle
 
 # Create results directory if it doesn't exist
 os.makedirs('failure_type_results', exist_ok=True)
@@ -39,6 +43,8 @@ df['Type_H'] = (df['Product ID'].str[0] == 'H').astype(int)
 df['Power [W]'] = df['Torque [Nm]'] * df['Rotational speed [rpm]'] * (2 * np.pi / 60)
 df['Temp_Diff [K]'] = df['Process temperature [K]'] - df['Air temperature [K]']
 df['Tool_Torque [minNm]'] = df['Tool wear [min]'] * df['Torque [Nm]']
+df['Speed_Torque_Ratio'] = df['Rotational speed [rpm]'] / (df['Torque [Nm]'] + 1e-6)  # Avoid division by zero
+df['Temp_Ratio'] = df['Process temperature [K]'] / df['Air temperature [K]']
 
 # Define features
 features = [
@@ -52,10 +58,22 @@ features = [
     'Type_H',
     'Power [W]',
     'Temp_Diff [K]',
-    'Tool_Torque [minNm]'
+    'Tool_Torque [minNm]',
+    'Speed_Torque_Ratio',
+    'Temp_Ratio'
 ]
 
 X = df[features]
+
+# Define hyperparameter grid
+param_grid = {
+    'n_estimators': [100, 200, 300],
+    'max_depth': [None, 10, 20, 30],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4],
+    'max_features': ['sqrt', 'log2'],
+    'class_weight': ['balanced', 'balanced_subsample']
+}
 
 # Train models for each failure mode
 results = {}
@@ -74,20 +92,43 @@ for failure_mode in failure_modes:
     print(f"Training set: {X_train.shape[0]} samples, Positive cases: {y_train.sum()} ({y_train.mean()*100:.2f}%)")
     print(f"Test set: {X_test.shape[0]} samples, Positive cases: {y_test.sum()} ({y_test.mean()*100:.2f}%)")
     
-    # Train Random Forest model
+    # Initialize base model
+    base_model = RandomForestClassifier(random_state=42, n_jobs=-1)
+    
+    # Initialize GridSearchCV
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    grid_search = GridSearchCV(
+        estimator=base_model,
+        param_grid=param_grid,
+        cv=cv,
+        scoring='roc_auc',
+        n_jobs=-1,
+        verbose=1
+    )
+    
+    # Train model with hyperparameter tuning
     start_time = time.time()
-    model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight='balanced')
-    model.fit(X_train, y_train)
+    grid_search.fit(X_train, y_train)
     train_time = time.time() - start_time
     print(f"Training time: {train_time:.2f} seconds")
+    
+    # Get best model
+    model = grid_search.best_estimator_
+    print(f"\nBest parameters for {failure_mode}:")
+    print(grid_search.best_params_)
     
     # Predictions
     y_pred = model.predict(X_test)
     y_pred_proba = model.predict_proba(X_test)[:, 1]
     
-    # Accuracy
+    # Calculate metrics
     accuracy = accuracy_score(y_test, y_pred)
+    precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
+    avg_precision = average_precision_score(y_test, y_pred_proba)
+    
+    print(f"\nPerformance Metrics for {failure_mode}:")
     print(f"Accuracy: {accuracy:.4f}")
+    print(f"Average Precision: {avg_precision:.4f}")
     
     # Classification report
     report = classification_report(y_test, y_pred)
@@ -113,116 +154,71 @@ for failure_mode in failure_modes:
     print(f"\nTop 5 Features for {failure_mode}:")
     for i, row in feature_importance.head(5).iterrows():
         print(f"  {row['Feature']}: {row['Importance']:.4f}")
-        
-    # Store results for this failure mode
+    
+    # Permutation importance
+    result = permutation_importance(model, X_test, y_test, n_repeats=10, random_state=42, n_jobs=-1)
+    perm_importance = pd.DataFrame({
+        'Feature': features,
+        'Importance': result.importances_mean
+    }).sort_values('Importance', ascending=False)
+    
+    print(f"\nTop 5 Features by Permutation Importance for {failure_mode}:")
+    for i, row in perm_importance.head(5).iterrows():
+        print(f"  {row['Feature']}: {row['Importance']:.4f}")
+    
+    # Save the model
+    with open(f'failure_type_results/{failure_mode.lower()}_model.pkl', 'wb') as f:
+        pickle.dump(model, f)
+    
+    # Plot feature importance
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='Importance', y='Feature', data=feature_importance.head(10))
+    plt.title(f'Feature Importance for {failure_mode}')
+    plt.tight_layout()
+    plt.savefig(f'failure_type_results/{failure_mode.lower()}_feature_importance.png')
+    plt.close()
+    
+    # Plot ROC curve
+    plt.figure(figsize=(8, 6))
+    plt.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(f'ROC Curve for {failure_mode}')
+    plt.legend(loc="lower right")
+    plt.savefig(f'failure_type_results/{failure_mode.lower()}_roc_curve.png')
+    plt.close()
+    
+    # Plot Precision-Recall curve
+    plt.figure(figsize=(8, 6))
+    plt.plot(recall, precision, label=f'PR curve (AP = {avg_precision:.2f})')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title(f'Precision-Recall Curve for {failure_mode}')
+    plt.legend(loc="lower left")
+    plt.savefig(f'failure_type_results/{failure_mode.lower()}_pr_curve.png')
+    plt.close()
+    
+    # Save results
     results[failure_mode] = {
-        'model': model,
         'accuracy': accuracy,
-        'auc': roc_auc,
-        'report': report,
-        'confusion_matrix': conf_matrix,
-        'feature_importance': feature_importance
+        'roc_auc': roc_auc,
+        'avg_precision': avg_precision,
+        'best_params': grid_search.best_params_,
+        'feature_importance': feature_importance.to_dict(),
+        'permutation_importance': perm_importance.to_dict()
     }
 
-# Create a combined model that predicts any type of failure
-print("\n--- Combined Machine Failure Prediction Model ---")
-
-# Define target
-y_combined = df['Machine failure']
-
-# Split the data
-X_train_combined, X_test_combined, y_train_combined, y_test_combined = train_test_split(
-    X, y_combined, test_size=0.2, random_state=42, stratify=y_combined
-)
-
-# Train Random Forest model
-start_time = time.time()
-combined_model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight='balanced')
-combined_model.fit(X_train_combined, y_train_combined)
-train_time = time.time() - start_time
-print(f"Training time: {train_time:.2f} seconds")
-
-# Predictions
-y_pred_combined = combined_model.predict(X_test_combined)
-y_pred_proba_combined = combined_model.predict_proba(X_test_combined)[:, 1]
-
-# Accuracy
-accuracy_combined = accuracy_score(y_test_combined, y_pred_combined)
-print(f"Accuracy: {accuracy_combined:.4f}")
-
-# Classification report
-report_combined = classification_report(y_test_combined, y_pred_combined)
-print("\nClassification Report for Combined Model:")
-print(report_combined)
-
-# Confusion matrix
-conf_matrix_combined = confusion_matrix(y_test_combined, y_pred_combined)
-print("\nConfusion Matrix for Combined Model:")
-print(conf_matrix_combined)
-
-# Calculate ROC and AUC
-fpr_combined, tpr_combined, _ = roc_curve(y_test_combined, y_pred_proba_combined)
-roc_auc_combined = auc(fpr_combined, tpr_combined)
-print(f"AUC-ROC: {roc_auc_combined:.4f}")
-
-# Feature importance
-feature_importance_combined = pd.DataFrame({
-    'Feature': features,
-    'Importance': combined_model.feature_importances_
-}).sort_values('Importance', ascending=False)
-
-print("\nTop 5 Features for Combined Model:")
-for i, row in feature_importance_combined.head(5).iterrows():
-    print(f"  {row['Feature']}: {row['Importance']:.4f}")
-
-# Store combined model results
-results['Combined'] = {
-    'model': combined_model,
-    'accuracy': accuracy_combined,
-    'auc': roc_auc_combined,
-    'report': report_combined,
-    'confusion_matrix': conf_matrix_combined,
-    'feature_importance': feature_importance_combined
-}
-
-# Write results to file
-with open('failure_type_results/failure_type_models.txt', 'w') as f:
-    f.write("Predictive Maintenance Models for Different Failure Types\n")
-    f.write("====================================================\n\n")
-    f.write(f"Dataset: {data_path}\n")
-    f.write(f"Total samples: {len(df)}\n\n")
-    
-    # Write failure mode statistics
-    f.write("Failure mode statistics:\n")
-    for mode in failure_modes:
-        f.write(f"- {mode}: {df[mode].sum()} ({df[mode].sum() / len(df) * 100:.2f}%)\n")
-    f.write(f"- Machine failure (any type): {df['Machine failure'].sum()} ({df['Machine failure'].mean()*100:.2f}%)\n\n")
-    
-    # Write model results for each failure mode
-    for mode in failure_modes + ['Combined']:
-        result = results[mode]
-        
-        if mode == 'Combined':
-            f.write(f"\n--- Combined Machine Failure Prediction Model ---\n")
-        else:
-            f.write(f"\n--- {mode} Failure Prediction Model ---\n")
-        
+# Save all results
+with open('failure_type_results/model_results.txt', 'w') as f:
+    for failure_mode, result in results.items():
+        f.write(f"\n{failure_mode} Results:\n")
         f.write(f"Accuracy: {result['accuracy']:.4f}\n")
-        f.write(f"AUC-ROC: {result['auc']:.4f}\n\n")
-        
-        f.write("Confusion Matrix:\n")
-        cm = result['confusion_matrix']
-        f.write(f"TN: {cm[0, 0]}, FP: {cm[0, 1]}\n")
-        f.write(f"FN: {cm[1, 0]}, TP: {cm[1, 1]}\n\n")
-        
-        f.write("Classification Report:\n")
-        f.write(result['report'])
-        f.write("\n")
-        
-        f.write("Top 5 Feature Importance:\n")
-        for i, row in result['feature_importance'].head(5).iterrows():
-            f.write(f"- {row['Feature']}: {row['Importance']:.4f}\n")
-        f.write("\n")
-
-print("\nResults saved to 'failure_type_results/failure_type_models.txt'")
-print("Failure type models training and evaluation complete!") 
+        f.write(f"ROC AUC: {result['roc_auc']:.4f}\n")
+        f.write(f"Average Precision: {result['avg_precision']:.4f}\n")
+        f.write(f"Best Parameters: {result['best_params']}\n")
+        f.write("\nTop 5 Features by Importance:\n")
+        for feature, importance in list(result['feature_importance']['Importance'].items())[:5]:
+            f.write(f"  {result['feature_importance']['Feature'][feature]}: {importance:.4f}\n") 

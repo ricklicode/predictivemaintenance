@@ -1,0 +1,36 @@
+Predictive Maintenance Models
+==================================================
+
+--- Failure Prediction Model ---
+Training set: 74696 samples (60%)
+Validation set: 24899 samples (20%)
+Test set: 24899 samples (20%)
+
+Validation Accuracy: 0.9991
+Validation AUC-ROC: 0.7803
+
+Test Accuracy: 0.9991
+Test AUC-ROC: 0.6835
+
+Confusion Matrix (Test):
+TN: 24876, FP: 2
+FN: 21, TP: 0
+
+Classification Report (Test):
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00     24878
+           1       0.00      0.00      0.00        21
+
+    accuracy                           1.00     24899
+   macro avg       0.50      0.50      0.50     24899
+weighted avg       1.00      1.00      1.00     24899
+
+Top 5 Feature Importance:
+- metric1: 0.3352
+- metric6: 0.2787
+- metric4: 0.0911
+- metric2: 0.0909
+- metric5: 0.0759
+
+
