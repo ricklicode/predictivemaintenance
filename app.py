@@ -143,6 +143,100 @@ def load_model_results():
     results['feature_distributions'] = feature_distributions
     return results
 
+def create_training_history_plot():
+    """Create a plot showing training and validation metrics over time"""
+    plt.figure(figsize=(10, 6))
+    
+    # Load training history from model_results
+    with open('model_results/training_history.json', 'r') as f:
+        history = json.load(f)
+    
+    plt.plot(history['train_accuracy'], label='Training Accuracy')
+    plt.plot(history['val_accuracy'], label='Validation Accuracy')
+    plt.plot(history['train_loss'], label='Training Loss')
+    plt.plot(history['val_loss'], label='Validation Loss')
+    
+    plt.title('Model Training History')
+    plt.xlabel('Epoch')
+    plt.ylabel('Metric Value')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    return create_plot(plt.gcf())
+
+def create_feature_correlation_plot(dataset):
+    """Create a heatmap showing correlations between all features"""
+    plt.figure(figsize=(12, 10))
+    
+    # Select numeric features
+    numeric_features = dataset.select_dtypes(include=[np.number]).columns
+    corr_matrix = dataset[numeric_features].corr()
+    
+    # Create heatmap
+    sns.heatmap(corr_matrix, 
+                annot=True, 
+                cmap='coolwarm', 
+                fmt='.2f',
+                square=True,
+                cbar_kws={'shrink': .8})
+    
+    plt.title('Feature Correlation Heatmap')
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    
+    return create_plot(plt.gcf())
+
+def create_feature_distributions_plot(dataset):
+    """Create distribution plots for each feature"""
+    plt.figure(figsize=(15, 10))
+    
+    # Select numeric features
+    numeric_features = dataset.select_dtypes(include=[np.number]).columns
+    
+    # Create subplots
+    n_features = len(numeric_features)
+    n_cols = 3
+    n_rows = (n_features + n_cols - 1) // n_cols
+    
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5*n_rows))
+    axes = axes.flatten()
+    
+    # Plot each feature
+    for idx, feature in enumerate(numeric_features):
+        sns.histplot(data=dataset, x=feature, ax=axes[idx], kde=True)
+        axes[idx].set_title(f'{feature} Distribution')
+        axes[idx].set_xlabel('')
+    
+    # Remove empty subplots
+    for idx in range(len(numeric_features), len(axes)):
+        fig.delaxes(axes[idx])
+    
+    plt.tight_layout()
+    return create_plot(plt.gcf())
+
+def create_failure_type_distribution_plot(stats):
+    """Create a plot showing the distribution of failure types"""
+    plt.figure(figsize=(10, 6))
+    
+    # Extract failure type counts
+    failure_types = list(stats['failure_types'].keys())
+    counts = list(stats['failure_types'].values())
+    
+    # Create bar plot
+    plt.bar(failure_types, counts)
+    plt.title('Distribution of Failure Types')
+    plt.xlabel('Failure Type')
+    plt.ylabel('Count')
+    plt.xticks(rotation=45)
+    
+    # Add count labels on top of bars
+    for i, count in enumerate(counts):
+        plt.text(i, count, str(count), ha='center', va='bottom')
+    
+    plt.tight_layout()
+    return create_plot(plt.gcf())
+
 # Routes
 @app.route('/')
 def index():
@@ -169,36 +263,11 @@ def index():
         }
     }
     
-    # Create feature distributions plot
-    plt.figure(figsize=(12, 8))
-    for i, feature in enumerate(['Air temperature [K]', 'Process temperature [K]', 
-                                'Rotational speed [rpm]', 'Torque [Nm]', 'Tool wear [min]']):
-        plt.subplot(2, 3, i+1)
-        sns.histplot(dataset[feature], kde=True)
-        plt.title(feature)
-    plt.tight_layout()
-    dist_plot = create_plot(plt.gcf())
-    plt.close()
-    
-    # Create failure type distribution
-    plt.figure(figsize=(10, 6))
-    failure_counts = [stats['failure_types'][t] for t in ['TWF', 'HDF', 'PWF', 'OSF', 'RNF']]
-    plt.bar(['TWF', 'HDF', 'PWF', 'OSF', 'RNF'], failure_counts)
-    plt.title('Failure Type Distribution')
-    plt.ylabel('Count')
-    plt.grid(axis='y', alpha=0.3)
-    failures_plot = create_plot(plt.gcf())
-    plt.close()
-    
-    # Create correlation matrix
-    plt.figure(figsize=(10, 8))
-    corr_features = ['Air temperature [K]', 'Process temperature [K]', 'Rotational speed [rpm]', 
-                     'Torque [Nm]', 'Tool wear [min]', 'Machine failure']
-    corr_matrix = dataset[corr_features].corr()
-    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
-    plt.title('Feature Correlation Matrix')
-    corr_plot = create_plot(plt.gcf())
-    plt.close()
+    # Create all plots
+    dist_plot = create_feature_distributions_plot(dataset)
+    failures_plot = create_failure_type_distribution_plot(stats)
+    corr_plot = create_feature_correlation_plot(dataset)
+    training_history_plot = create_training_history_plot()
     
     # Load model results
     try:
@@ -214,6 +283,7 @@ def index():
                           dist_plot=dist_plot,
                           failures_plot=failures_plot,
                           corr_plot=corr_plot,
+                          training_history_plot=training_history_plot,
                           model_results=model_results,
                           failure_model_results=failure_model_results)
 

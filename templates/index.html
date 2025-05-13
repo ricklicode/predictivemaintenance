@@ -224,6 +224,34 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Training History -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Training History
+                    </div>
+                    <div class="card-body">
+                        <div id="training-history-chart" class="chart-container">
+                            <img src="data:image/png;base64,{{ training_history_plot }}" class="img-fluid" alt="Training History">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature Correlation Heatmap -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Feature Correlation Heatmap
+                    </div>
+                    <div class="card-body">
+                        <div id="correlation-heatmap" class="chart-container">
+                            <img src="data:image/png;base64,{{ corr_plot }}" class="img-fluid" alt="Feature Correlation Heatmap">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

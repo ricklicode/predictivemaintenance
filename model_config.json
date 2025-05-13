@@ -9,4 +9,4 @@
     "failure_column": "Machine failure",
     "id_column": "UID",
     "output_dir": "model_results"
-} 
+}

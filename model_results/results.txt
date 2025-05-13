@@ -24,3 +24,7 @@ F1 Score: 0.7288
 Confusion Matrix:
   [1925, 7]
   [25, 43]
+F1 Score: 0.6724
+Confusion Matrix:
+  [1923, 9]
+  [29, 39]

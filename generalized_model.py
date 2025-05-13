@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKF
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     classification_report, confusion_matrix, accuracy_score,
-    roc_curve, auc, precision_recall_curve, average_precision_score, f1_score
+    roc_curve, auc, precision_recall_curve, average_precision_score, f1_score, log_loss
 )
 from sklearn.preprocessing import StandardScaler
 import os
@@ -95,15 +95,23 @@ class PredictiveMaintenanceModel:
         if self.failure_column and self.failure_column in numeric_cols:
             numeric_cols = numeric_cols.drop(self.failure_column)
         
+        # Create a dictionary to store new features
+        new_features = {}
+        
         # Create interaction features using numpy operations for better performance
         n = len(numeric_cols)
         for i in range(n):
             for j in range(i+1, n):
                 col1, col2 = numeric_cols[i], numeric_cols[j]
                 # Use numpy operations for better performance
-                df_eng[f'{col1}_{col2}_product'] = np.multiply(df_eng[col1], df_eng[col2])
-                df_eng[f'{col1}_{col2}_ratio'] = np.divide(df_eng[col1], df_eng[col2] + 1e-6)
-                df_eng[f'{col1}_{col2}_diff'] = np.subtract(df_eng[col1], df_eng[col2])
+                new_features[f'{col1}_{col2}_product'] = np.multiply(df_eng[col1], df_eng[col2])
+                new_features[f'{col1}_{col2}_ratio'] = np.divide(df_eng[col1], df_eng[col2] + 1e-6)
+                new_features[f'{col1}_{col2}_diff'] = np.subtract(df_eng[col1], df_eng[col2])
+        
+        # Add all new features at once using pd.concat
+        if new_features:
+            new_features_df = pd.DataFrame(new_features, index=df_eng.index)
+            df_eng = pd.concat([df_eng, new_features_df], axis=1)
         
         return df_eng
     
@@ -153,6 +161,9 @@ class PredictiveMaintenanceModel:
         dict
             Dictionary containing training results and metrics
         """
+        # Start timing
+        start_time = time.time()
+        
         # Update configuration
         if failure_column:
             self.failure_column = failure_column
@@ -220,26 +231,50 @@ class PredictiveMaintenanceModel:
             verbose=1
         )
         
-        # Train model
-        start_time = time.time()
-        grid_search.fit(X_train_scaled, y_train)
-        train_time = time.time() - start_time
+        # Initialize training history
+        history = {
+            'train_accuracy': [],
+            'val_accuracy': [],
+            'train_loss': [],
+            'val_loss': []
+        }
         
-        # Get best model
-        self.model = grid_search.best_estimator_
+        # Train model with history tracking
+        for fold, (train_idx, val_idx) in enumerate(cv.split(X_train_scaled, y_train)):
+            X_fold_train = X_train_scaled[train_idx]
+            y_fold_train = y_train.iloc[train_idx]
+            X_fold_val = X_train_scaled[val_idx]
+            y_fold_val = y_train.iloc[val_idx]
+            
+            # Train model
+            self.model = grid_search.fit(X_fold_train, y_fold_train).best_estimator_
+            
+            # Record metrics
+            train_pred = self.model.predict(X_fold_train)
+            val_pred = self.model.predict(X_fold_val)
+            
+            history['train_accuracy'].append(accuracy_score(y_fold_train, train_pred))
+            history['val_accuracy'].append(accuracy_score(y_fold_val, val_pred))
+            history['train_loss'].append(log_loss(y_fold_train, train_pred))
+            history['val_loss'].append(log_loss(y_fold_val, val_pred))
         
-        # Make predictions
-        y_pred = self.model.predict(X_test_scaled)
-        y_pred_proba = self.model.predict_proba(X_test_scaled)[:, 1]
+        # Save training history
+        with open(os.path.join(self.output_dir, 'training_history.json'), 'w') as f:
+            json.dump(history, f)
+        
+        # Save predictions
+        predictions = self.model.predict_proba(X_test_scaled)[:, 1]
+        with open(os.path.join(self.output_dir, 'predictions.json'), 'w') as f:
+            json.dump(predictions.tolist(), f)
         
         # Calculate metrics
-        accuracy = accuracy_score(y_test, y_pred)
-        precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
-        avg_precision = average_precision_score(y_test, y_pred_proba)
-        fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
+        accuracy = accuracy_score(y_test, self.model.predict(X_test_scaled))
+        precision, recall, _ = precision_recall_curve(y_test, predictions)
+        avg_precision = average_precision_score(y_test, predictions)
+        fpr, tpr, _ = roc_curve(y_test, predictions)
         roc_auc = auc(fpr, tpr)
-        f1 = f1_score(y_test, y_pred)
-        cm = confusion_matrix(y_test, y_pred)
+        f1 = f1_score(y_test, self.model.predict(X_test_scaled))
+        cm = confusion_matrix(y_test, self.model.predict(X_test_scaled))
         
         # Calculate feature importance
         self.feature_importance = pd.DataFrame({
@@ -291,7 +326,7 @@ class PredictiveMaintenanceModel:
             'best_params': grid_search.best_params_,
             'feature_importance': self.feature_importance.to_dict(),
             'permutation_importance': self.permutation_importance.to_dict(),
-            'training_time': train_time,
+            'training_time': time.time() - start_time,
             'fpr': fpr.tolist(),
             'tpr': tpr.tolist(),
             'precision': precision.tolist(),

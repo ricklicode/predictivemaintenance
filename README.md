@@ -10,6 +10,9 @@ A flexible and optimized machine learning model for predictive maintenance tasks
 - **Comprehensive Evaluation**: Detailed performance metrics and visualizations
 - **Interactive Dashboard**: Web-based dashboard to visualize model results and make predictions
 - **Cross-Validation**: 5-fold stratified cross-validation for reliable performance estimation
+- **Training History Tracking**: Monitor model performance during training
+- **Feature Correlation Analysis**: Understand relationships between features
+- **Failure Timeline Visualization**: Compare actual vs predicted failures
 
 ## Installation
 
@@ -89,9 +92,13 @@ python app.py
 ```
 
 Visit `http://localhost:5000` to view:
-- Model performance metrics
+- Model performance metrics (Accuracy, ROC AUC, F1 Score)
 - Feature importance analysis
 - ROC and Precision-Recall curves
+- Confusion Matrix
+- Training History plots
+- Feature Correlation Heatmap
+- Failure Timeline visualization
 - Model parameters
 
 ## Model Details
@@ -100,19 +107,33 @@ Visit `http://localhost:5000` to view:
 - Automatic creation of interaction features
 - Optimized using numpy operations for better performance
 - Handles missing values and scaling
+- Feature correlation analysis
 
 ### Training Process
 - 5-fold stratified cross-validation
 - Optimized hyperparameter search
 - Early stopping for faster training
 - Parallel processing for improved speed
+- Training history tracking
 
 ### Performance Metrics
 - Accuracy
 - ROC AUC
 - Average Precision
+- F1 Score
 - Feature Importance
 - Training Time
+- Confusion Matrix
+- Feature Correlations
+
+### Visualizations
+- Training History plots (accuracy and loss)
+- Feature Correlation Heatmap
+- Failure Timeline (actual vs predicted)
+- ROC and Precision-Recall curves
+- Feature Importance plots
+- Confusion Matrix
+- Feature Distributions
 
 ## Project Structure
 
@@ -127,6 +148,8 @@ predictivemaintenance/
 │   ├── scaler.pkl
 │   ├── feature_importance.csv
 │   ├── results.txt
+│   ├── training_history.json
+│   ├── predictions.json
 │   └── visualizations/
 └── templates/            # Web dashboard templates
     └── index.html
@@ -140,6 +163,8 @@ The model has been optimized for speed and efficiency:
 3. **Early Stopping**: Starts from optimized default parameters
 4. **Parallel Processing**: Utilizes multiple CPU cores
 5. **Memory Efficiency**: Optimized data structures and operations
+6. **Training History**: Efficient tracking of model performance
+7. **Visualization Optimization**: Optimized plot generation and caching
 
 ## Contributing
 
